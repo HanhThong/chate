@@ -1,5 +1,27 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
+import * as WebSocketManager from './websocket';
 declare const MAIN_WINDOW_WEBPACK_ENTRY: any;
+
+ipcMain.on('loginWebSocket', (event, { userName, accessToken }) => {
+  WebSocketManager.login(userName, accessToken);
+
+  const connection = WebSocketManager.getConnection();
+  connection.on('open', () => {
+    event.sender.send('loginWebSocketSuccess');
+  });
+
+  connection.on('error', () => {
+    event.sender.send('loginWebSocketFailed');
+  });
+
+  connection.on('message', (data) => {
+    event.sender.send('onMessage', data);
+  })
+});
+
+ipcMain.on('sendMessage', (event, { fromUser, toUser, payload }) => {
+  WebSocketManager.sendMessage(fromUser, toUser, payload);
+});
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) { // eslint-disable-line global-require
@@ -8,13 +30,26 @@ if (require('electron-squirrel-startup')) { // eslint-disable-line global-requir
 
 const createWindow = (): void => {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  let mainWindow = new BrowserWindow({
     height: 600,
     width: 800,
+    webPreferences: {
+      nodeIntegration: true,
+      enableRemoteModule: true,
+    },
   });
 
   // and load the index.html of the app.
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+
+  mainWindow.on('close', () => {
+    WebSocketManager.closeConnection();
+    mainWindow = null;
+
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
+  });
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
