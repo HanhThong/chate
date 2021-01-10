@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 
-export const WS_SERVER = 'ws://localhost:8080';
+// export const WS_SERVER = 'ws://localhost:8080';
+export const WS_SERVER = 'wss://chate.tk';
 
 export const websocket: { connection: WebSocket} = { connection: undefined };
 

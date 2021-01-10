@@ -2,8 +2,10 @@ import axios from 'axios';
 import fs from 'fs';
 import WebSocket from 'ws';
 
-export const SERVER_URL = 'http://localhost:8080/api';
-export const WS_SERVER = 'ws://localhost:8080';
+// export const SERVER_URL = 'http://localhost:8080/api';
+export const SERVER_URL = 'https://chate.tk/api';
+// export const WS_SERVER = 'ws://localhost:8080';
+export const WS_SERVER = 'wss://chate.tk';
 
 export const register = (payload: any) => {
     return axios.post(`${SERVER_URL}/register`, payload);
