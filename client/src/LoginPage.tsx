@@ -52,6 +52,12 @@ export default function SignIn() {
     ipcRenderer.on('loginWebSocketFailed', (event, args) => {
       console.log('Error');
     });
+
+    ipcRenderer.on('connectionDisconnected', (event, args) => {
+      history.push('/');
+    });
+
+    localStorage.clear();
   }, []);
 
   const login = React.useCallback(async () => {

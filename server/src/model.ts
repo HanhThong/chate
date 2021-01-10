@@ -28,6 +28,7 @@ export const MessageSchema = new Schema({
   },
   timestamp: {
     type: Date,
+    default: Date.now,
   }
 });
 

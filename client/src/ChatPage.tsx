@@ -30,7 +30,6 @@ import OutlinedInput from '@material-ui/core/OutlinedInput';
 import { useUserName, usePrivateKeyPath } from './hooks';
 import * as Services from './services';
 
-
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
@@ -50,30 +49,77 @@ const useStyles = makeStyles((theme: Theme) =>
 
 export const ChatPage = () => {
   const classes = useStyles();
+  const [fUpdate, setFUpdate] = React.useState(0);
   const [message, setMessage] = React.useState('');
   const [users, setUsers] = React.useState<any>([]);
   const { userName } = useUserName();
   const { privateKeyPath } = usePrivateKeyPath();
+  const [privateKey, setPrivateKey] = React.useState<any>();
   const [targetUser, setTargetUser] = React.useState('');
+  const [messageData, setMessageData] = React.useState<any>(JSON.parse(localStorage.getItem('messageData') || '{}'));
 
   React.useMemo(async () => {
     const allUser = await Services.getAllUser();
     setUsers(allUser);
-    console.log(allUser);
   }, []);
 
+  React.useMemo(async () => {
+    const pk = await fs.promises.readFile(privateKeyPath);
+    setPrivateKey(pk);
+  }, [privateKeyPath]);
+
+  React.useMemo(async () => {
+    Services.downloadPublicKey(targetUser);
+  }, [targetUser]);
+
   React.useMemo(() => {
-    ipcRenderer.on('onMessage', (message) => {
-      console.log(message);
+    ipcRenderer.on('onMessage', async (event, message) => {
+      const parsedMessage: any = JSON.parse(message);
+      if (!Array.isArray(messageData[parsedMessage['fromUser']])) {
+        messageData[parsedMessage['fromUser']] = [];
+      }
+
+      let key = parsedMessage['fromUser'];
+      if (key == userName) {
+        key = parsedMessage['toUser'];
+      }
+
+      if (!Array.isArray(messageData[key])) {
+        messageData[key] = [];
+      }
+
+      messageData[key].push(parsedMessage);
+      setMessageData({...messageData});
+      localStorage.setItem('messageData',  JSON.stringify(messageData));
     })
   }, []);
 
   const sendMessage = async () => {
-    const payload = { message, timestamp: new Date() };
-    const privateKey = await fs.promises.readFile(privateKeyPath);
-    const encryptedMessage = crypto.privateEncrypt(privateKey, Buffer.from(JSON.stringify(payload)));
-    ipcRenderer.send('sendMessage', { fromUser: userName, toUser: 'Test', payload: encryptedMessage.toString() });
+    const payload = { message, timestamp: new Date().toISOString() };
+    const publicKey = await fs.promises.readFile(`${Services.publickKeyDir}/${targetUser}.pub`);
+    const encryptedMessage = crypto.publicEncrypt(publicKey, Buffer.from(JSON.stringify(payload)));
+    ipcRenderer.send('sendMessage', { fromUser: userName, toUser: targetUser, payload: encryptedMessage.toString('base64') });
+    setMessage('');
+
+    if (!Array.isArray(messageData[targetUser])) {
+      messageData[targetUser] = [];
+    }
+
+    messageData[targetUser].push({ fromUser: userName, toUser: targetUser, payload });
+    localStorage.setItem('messageData',  JSON.stringify(messageData));
+    setMessageData({...messageData});
   }
+
+  const getMessageInTab = () => messageData[targetUser] || [];
+
+  const tabMessage = getMessageInTab().map((message: any) => {
+    if (message.fromUser != userName) {
+      const payload = message.payload;
+      const decryptMessage = crypto.privateDecrypt(privateKey, Buffer.from(payload, 'base64'));
+      return { ...message, payload: JSON.parse(decryptMessage.toString()) };
+    }
+    return message;
+  })
 
   return (
     <div className={classes.root}>
@@ -84,7 +130,9 @@ export const ChatPage = () => {
               {users.map((user: any) => {
                 if (user.userName !== userName) {
                   return (
-                    <MenuItem key={user.username} onClick={() => setTargetUser(user.username)}>
+                    <MenuItem key={user.userName} onClick={() => {
+                      setTargetUser(user.userName);
+                    }}>
                       <ListItemIcon>
                         <AccountBoxIcon fontSize="large" />
                       </ListItemIcon>
@@ -98,71 +146,60 @@ export const ChatPage = () => {
         </Grid>
         <Grid item xs={9}>
           <Paper className={classes.paper} style={{ display: 'block', position: 'relative' }}>
-            <List>
-              <ListItem alignItems="flex-start">
-                <ListItemAvatar>
-                  <Avatar alt="Hanh Thong" src="/static/images/avatar/1.jpg" />
-                </ListItemAvatar>
-                <ListItemText
-                  primary="Brunch this weekend?"
-                  secondary={
-                    <React.Fragment>
-                      10:00 24-01-2021
-                    </React.Fragment>
-                  }
-                />
-              </ListItem>
-              <ListItem alignItems="flex-start">
-                <ListItemText
-                  primary="Brunch this weekend?"
-                  secondary={
-                    <React.Fragment>
-                      10:00 24-01-2021
-                    </React.Fragment>
-                  }
-                  style={{ textAlign: 'right', paddingRight: 15 }}
-                />
-                <ListItemAvatar>
-                  <Avatar alt="Hanh Thong" src="/static/images/avatar/1.jpg" />
-                </ListItemAvatar>
-              </ListItem>
-
-              <ListItem alignItems="flex-start">
-                <ListItemText
-                  primary="Brunch this weekend?"
-                  secondary={
-                    <React.Fragment>
-                      10:00 24-01-2021
-                    </React.Fragment>
-                  }
-                  style={{ textAlign: 'right', paddingRight: 15 }}
-                />
-                <ListItemAvatar>
-                  <Avatar alt="Hanh Thong" src="/static/images/avatar/1.jpg" />
-                </ListItemAvatar>
-              </ListItem>
-
-              <ListItem alignItems="flex-start">
-                <ListItemText
-                  primary="Brunch this weekend?"
-                  secondary={
-                    <React.Fragment>
-                      10:00 24-01-2021
-                    </React.Fragment>
-                  }
-                  style={{ textAlign: 'right', paddingRight: 15 }}
-                />
-                <ListItemAvatar>
-                  <Avatar alt="Hanh Thong" src="/static/images/avatar/1.jpg" />
-                </ListItemAvatar>
-              </ListItem>
+            <List style={{ height: 'calc(100vh - 110px)', overflow: 'scroll'}}>
+              {tabMessage.map((message: any) => {
+                if (message.fromUser === userName) {
+                  console.log(message);
+                  return (
+                    <ListItem alignItems="flex-start" key={message.payload.timestamp}>
+                      <ListItemText
+                        primary={message.payload.message}
+                        secondary={
+                          <React.Fragment>
+                            {message.payload.timestamp}
+                          </React.Fragment>
+                        }
+                        style={{ textAlign: 'right', paddingRight: 15 }}
+                      />
+                      <ListItemAvatar>
+                        <Avatar alt={message.fromUser} src={`/static/images/avatar/${message.fromUser}`} />
+                      </ListItemAvatar>
+                    </ListItem>
+                  )
+                } else {
+                  return (
+                    <ListItem alignItems="flex-start" key={message.timestamp}>
+                      <ListItemAvatar>
+                        <Avatar alt={message.fromUser} src={`/static/images/avatar/${message.fromUser}`} />
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={message.payload.message}
+                        secondary={
+                          <React.Fragment>
+                            {message.timestamp}
+                          </React.Fragment>
+                        }
+                      />
+                    </ListItem>
+                  )
+                }
+              })}
             </List>
 
             <FormControl variant="outlined" fullWidth style={{ position: 'absolute', bottom: 0, left: 0, padding: 10, width: 'calc(100% - 20px)' }}>
               <OutlinedInput
                 id="text"
-                onChange={event => setMessage(event.target.value)}
-                onKeyDown={event => event.key === 'Enter' && sendMessage()}
+                value={message}
+                onChange={event => {
+                  setMessage(event.target.value);
+                  setFUpdate(fUpdate + 1);
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    sendMessage();
+                    setFUpdate(fUpdate + 1);
+                  }
+                }}
                 endAdornment={
                   <InputAdornment position="end">
                     <IconButton

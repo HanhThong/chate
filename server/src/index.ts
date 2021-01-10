@@ -8,10 +8,9 @@ import fileUpload from 'express-fileupload';
 import mongoose from 'mongoose';
 import { exit } from 'process';
 
-
 import { ConnectionManager } from './connection';
 import { EncryptedMessagePayload } from './types';
-import { UserModel, MessageModel } from './model';
+import { UserModel, MessageModel, MessageSchema } from './model';
 
 const mongodbUri = 'mongodb://root:EncryptProject@localhost:27017/encrypt_chat?authSource=admin';
 mongoose.connect(mongodbUri, { useUnifiedTopology: true }, (error) => {
@@ -34,18 +33,20 @@ app.use(cors());
 app.use(fileUpload());
 app.use(express.json());
 
-app.use('/cer', express.static(CER_PATH));
+app.use('/api/cer', express.static(CER_PATH));
 
 const connectionManager = new ConnectionManager();
 
-wsServer.on('connection', (ws: WebSocket, request: http.IncomingMessage, client: { userId: string }) => {
+wsServer.on('connection', async (ws: WebSocket, request: http.IncomingMessage, client: { userId: string }) => {
     console.info(`A new connection from ${client.userId}`);
     connectionManager.addConnection(client.userId, ws);
 
-    ws.on('message', (message: string) => {
-        console.log(message);
+    ws.on('message', async (message: string) => {
         const payload: EncryptedMessagePayload = JSON.parse(message);
-        connectionManager.sendMessage(payload.toUser, message);
+
+        if (!connectionManager.sendMessage(payload.toUser, message)) {
+            await MessageModel.create(payload);
+        }
     });
 
     ws.on('close', (code, reson) => {
@@ -53,7 +54,10 @@ wsServer.on('connection', (ws: WebSocket, request: http.IncomingMessage, client:
         connectionManager.removeConnection(client.userId);
     });
 
-    ws.send('Hi there, I am a WebSocket server');
+    const prevMessages = await MessageModel.find({ $or: [{ toUser: client.userId }, { fromUser: client.userId }]});
+    prevMessages.map((message: any) => {
+        ws.send(JSON.stringify(message));
+    });
 });
 
 app.post('/api/register', (req, res) => {

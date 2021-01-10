@@ -17,6 +17,10 @@ ipcMain.on('loginWebSocket', (event, { userName, accessToken }) => {
   connection.on('message', (data) => {
     event.sender.send('onMessage', data);
   })
+
+  connection.on('close', () => {
+    event.sender.send('connectionDisconnected');
+  });
 });
 
 ipcMain.on('sendMessage', (event, { fromUser, toUser, payload }) => {
