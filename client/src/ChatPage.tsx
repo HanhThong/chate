@@ -57,6 +57,7 @@ export const ChatPage = () => {
   const [privateKey, setPrivateKey] = React.useState<any>();
   const [targetUser, setTargetUser] = React.useState('');
   const [messageData, setMessageData] = React.useState<any>(JSON.parse(localStorage.getItem('messageData') || '{}'));
+  const listMessageRef = React.useRef(null);
 
   React.useMemo(async () => {
     const allUser = await Services.getAllUser();
@@ -64,8 +65,11 @@ export const ChatPage = () => {
   }, []);
 
   React.useMemo(async () => {
-    const pk = await fs.promises.readFile(privateKeyPath);
-    setPrivateKey(pk);
+    console.log('Read private Key:' + privateKeyPath);
+    if (!!privateKeyPath) {
+      const pk = await fs.promises.readFile(privateKeyPath);
+      setPrivateKey(pk);
+    }
   }, [privateKeyPath]);
 
   React.useMemo(async () => {
@@ -91,10 +95,15 @@ export const ChatPage = () => {
       messageData[key].push(parsedMessage);
       setMessageData({...messageData});
       localStorage.setItem('messageData',  JSON.stringify(messageData));
+
+      setTimeout(() => {
+        listMessageRef.current.scrollTop = listMessageRef.current.scrollHeight;
+      }, 1000);
     })
   }, []);
 
   const sendMessage = async () => {
+    console.log('sendMessage');
     const payload = { message, timestamp: new Date().toISOString() };
     const publicKey = await fs.promises.readFile(`${Services.publickKeyDir}/${targetUser}.pub`);
     const encryptedMessage = crypto.publicEncrypt(publicKey, Buffer.from(JSON.stringify(payload)));
@@ -108,6 +117,10 @@ export const ChatPage = () => {
     messageData[targetUser].push({ fromUser: userName, toUser: targetUser, payload });
     localStorage.setItem('messageData',  JSON.stringify(messageData));
     setMessageData({...messageData});
+
+    setTimeout(() => {
+      listMessageRef.current.scrollTop = listMessageRef.current.scrollHeight;
+    }, 1000);
   }
 
   const getMessageInTab = () => messageData[targetUser] || [];
@@ -130,7 +143,7 @@ export const ChatPage = () => {
               {users.map((user: any) => {
                 if (user.userName !== userName) {
                   return (
-                    <MenuItem key={user.userName} onClick={() => {
+                    <MenuItem style={targetUser === user.userName ? {background: '#b78585'} : {}} key={user.userName} onClick={() => {
                       setTargetUser(user.userName);
                     }}>
                       <ListItemIcon>
@@ -146,7 +159,7 @@ export const ChatPage = () => {
         </Grid>
         <Grid item xs={9}>
           <Paper className={classes.paper} style={{ display: 'block', position: 'relative' }}>
-            <List style={{ height: 'calc(100vh - 110px)', overflow: 'scroll'}}>
+            <List style={{ height: 'calc(100vh - 110px)', overflow: 'scroll'}} ref={listMessageRef}>
               {tabMessage.map((message: any) => {
                 if (message.fromUser === userName) {
                   console.log(message);
@@ -168,7 +181,7 @@ export const ChatPage = () => {
                   )
                 } else {
                   return (
-                    <ListItem alignItems="flex-start" key={message.timestamp}>
+                    <ListItem alignItems="flex-start" key={message.payload.timestamp}>
                       <ListItemAvatar>
                         <Avatar alt={message.fromUser} src={`/static/images/avatar/${message.fromUser}`} />
                       </ListItemAvatar>
@@ -176,7 +189,7 @@ export const ChatPage = () => {
                         primary={message.payload.message}
                         secondary={
                           <React.Fragment>
-                            {message.timestamp}
+                            {message.payload.timestamp}
                           </React.Fragment>
                         }
                       />

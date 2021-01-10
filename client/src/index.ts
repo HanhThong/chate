@@ -3,6 +3,7 @@ import * as WebSocketManager from './websocket';
 declare const MAIN_WINDOW_WEBPACK_ENTRY: any;
 
 ipcMain.on('loginWebSocket', (event, { userName, accessToken }) => {
+  console.log('Req login ' + userName);
   WebSocketManager.login(userName, accessToken);
 
   const connection = WebSocketManager.getConnection();
@@ -11,6 +12,7 @@ ipcMain.on('loginWebSocket', (event, { userName, accessToken }) => {
   });
 
   connection.on('error', () => {
+    console.log('Login Error: ' + userName);
     event.sender.send('loginWebSocketFailed');
   });
 

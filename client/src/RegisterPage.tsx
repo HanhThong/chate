@@ -71,13 +71,13 @@ export default function RegisterPage() {
   return (
     <Container component="main" maxWidth="xs">
       <CssBaseline />
-      <Snackbar open={isOpenSuccess} autoHideDuration={5000} onClose={() => history.push('/')} children={
+      <Snackbar open={isOpenSuccess} autoHideDuration={3000} onClose={() => history.push('/')} children={
         <Alert onClose={() => setIsOpenSuccess(false)} severity="success">
           Register successfull
         </Alert>
       }/>
 
-      <Snackbar open={isOpenFailed} autoHideDuration={5000} onClose={() => setIsOpenFailed(false)} children={
+      <Snackbar open={isOpenFailed} autoHideDuration={3000} onClose={() => setIsOpenFailed(false)} children={
         <Alert onClose={() => setIsOpenFailed(false)} severity="error">
           Register failed. Please check your data.
         </Alert>

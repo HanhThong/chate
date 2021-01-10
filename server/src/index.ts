@@ -55,9 +55,14 @@ wsServer.on('connection', async (ws: WebSocket, request: http.IncomingMessage, c
     });
 
     const prevMessages = await MessageModel.find({ $or: [{ toUser: client.userId }, { fromUser: client.userId }]});
+
     prevMessages.map((message: any) => {
         ws.send(JSON.stringify(message));
     });
+
+    for (let message of prevMessages) {
+        await MessageModel.deleteOne({_id: message._id});
+    }
 });
 
 app.post('/api/register', (req, res) => {

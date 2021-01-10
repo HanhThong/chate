@@ -14,6 +14,9 @@ import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import Container from '@material-ui/core/Container';
+import Snackbar from '@material-ui/core/Snackbar';
+import MuiAlert from '@material-ui/lab/Alert';
+
 import { Link as RouterLink, useHistory } from 'react-router-dom';
 import { useUserName, usePrivateKeyPath } from './hooks';
 
@@ -37,12 +40,19 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
+export const Alert = (props: any) => {
+  return <MuiAlert elevation={6} variant="filled" {...props} />;
+}
+
 export default function SignIn() {
   const classes = useStyles();
   const history = useHistory();
 
   const { userName, setUserName } = useUserName();
   const { privateKeyPath, setPrivateKeyPath } = usePrivateKeyPath();
+  const [pkPath, setPkPath] = React.useState('');
+  const [isShowLoginFailed, setIsShowLoginFailed] = React.useState(false);
+  const [fUpdate, setFUpdate] = React.useState(0);
 
   React.useMemo(() => {
     ipcRenderer.on('loginWebSocketSuccess', (event, args) => {
@@ -51,6 +61,7 @@ export default function SignIn() {
 
     ipcRenderer.on('loginWebSocketFailed', (event, args) => {
       console.log('Error');
+      setIsShowLoginFailed(true);
     });
 
     ipcRenderer.on('connectionDisconnected', (event, args) => {
@@ -60,20 +71,32 @@ export default function SignIn() {
     localStorage.clear();
   }, []);
 
-  const login = React.useCallback(async () => {
-    const privateKey = await fs.promises.readFile(privateKeyPath, 'utf-8');
+  const login = async () => {
+    console.log(pkPath);
+    
+    const privateKey = await fs.promises.readFile(pkPath, 'utf-8');
     const payload = {
       userName,
       timestamp: new Date(),
     }
-    const encryptedPayload = crypto.privateEncrypt(privateKey, Buffer.from(JSON.stringify(payload)));
 
+    const encryptedPayload = crypto.privateEncrypt(privateKey, Buffer.from(JSON.stringify(payload)));
     ipcRenderer.send('loginWebSocket', { userName, accessToken: encryptedPayload.toString('base64') });
-  }, [userName, privateKeyPath]);
+    setPrivateKeyPath(pkPath);
+
+    setTimeout(() => setIsShowLoginFailed(true), 3000);
+  }
 
   return (
     <Container component="main" maxWidth="xs">
       <CssBaseline />
+
+      <Snackbar open={isShowLoginFailed} autoHideDuration={3000} onClose={() => setIsShowLoginFailed(false)} children={
+        <Alert onClose={() => setIsShowLoginFailed(false)} severity="error">
+          Login infomation is not correct
+        </Alert>
+      }/>
+
       <div className={classes.paper}>
         <Avatar className={classes.avatar}>
           <LockOutlinedIcon />
@@ -101,7 +124,10 @@ export default function SignIn() {
             size="large"
           >
             Select Private Key
-            <input type="file" hidden onChange={event => setPrivateKeyPath(event.target.files[0]!.path)} />
+            <input type="file" hidden onChange={event => {
+              console.log(event.target.files[0]);
+              setPkPath(event.target.files[0]!.path);
+            }} />
           </Button>
           <FormControlLabel
             control={<Checkbox value="remember" color="primary" />}
